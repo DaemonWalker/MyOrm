@@ -14,15 +14,15 @@ using System.Text;
 
 namespace MyOrm.DBContext
 {
-    public abstract class AbsDBContext<T> : IQueryable<T>, IOrderedQueryable<T> where T : class
+    public abstract class AbsDBContext<TEntity> : IQueryable<TEntity>, IOrderedQueryable<TEntity> where TEntity : class
     {
-        private Dictionary<T, EntityEntry<T>> entityDict = new Dictionary<T, EntityEntry<T>>();
-        private Dictionary<object, T> pkDict = new Dictionary<object, T>();
+        private Dictionary<TEntity, EntityEntry<TEntity>> entityDict = new Dictionary<TEntity, EntityEntry<TEntity>>();
+        private Dictionary<object, TEntity> pkDict = new Dictionary<object, TEntity>();
         private PropertyInfo entityPKProp;
         public AbsDBContext()
         {
             this.entityPKProp = this.GetPKProperty(this.ElementType);
-            this.provider = new QueryProvider<T>();
+            this.provider = new QueryProvider<TEntity>();
             this.expression = Expression.Constant(this);
 
         }
@@ -58,9 +58,9 @@ namespace MyOrm.DBContext
                 return this.provider;
             }
         }
-        public IEnumerator<T> GetEnumerator()
+        public IEnumerator<TEntity> GetEnumerator()
         {
-            var result = this.provider.Execute<List<T>>(expression);
+            var result = this.provider.Execute<List<TEntity>>(expression);
             if (result == null)
             {
                 yield break;
@@ -76,28 +76,57 @@ namespace MyOrm.DBContext
             throw new NotImplementedException();
         }
 
-        public void InsertEntityEntry(T entity)
+        public void InsertEntityEntry(TEntity entity)
         {
             var pk = this.entityPKProp.GetValue(entity);
             if (pkDict.ContainsKey(pk))
             {
                 return;
             }
-            var entry = new EntityEntry<T>(entity, EntityState.Select);
+            var entry = new EntityEntry<TEntity>(entity, EntityState.Select);
             this.entityDict.Add(entity, entry);
             this.pkDict.Add(pk, entity);
         }
         #endregion
-        public virtual T Add(T t)
+        public virtual EntityEntry<TEntity> Add(TEntity t)
         {
-            return t;
+            EntityEntry<TEntity> entry = null;
+            if (this.entityDict.ContainsKey(t) == false)
+            {
+                entry = new EntityEntry<TEntity>(t, EntityState.Insert);
+                this.entityDict.Add(t, entry);
+            }
+            else
+            {
+                entry = this.entityDict[t];
+            }
+            return entry;
         }
-        public virtual List<T> AddRange(IEnumerable<T> ts)
+        public virtual List<EntityEntry<TEntity>> AddRange(IEnumerable<TEntity> ts)
         {
-            return ts.ToList();
+            var list = new List<EntityEntry<TEntity>>();
+            foreach (var item in ts)
+            {
+                list.Add(this.Add(item));
+            }
+            return list;
+        }
+        public virtual EntityEntry<TEntity> Delete(TEntity t)
+        {
+            this.entityDict[t].EntityState = EntityState.Delete;
+            return this.entityDict[t];
+        }
+        public virtual List<EntityEntry<TEntity>> DeleteRange(IEnumerable<TEntity> ts)
+        {
+            var list = new List<EntityEntry<TEntity>>();
+            foreach (var t in ts)
+            {
+                list.Add(this.Delete(t));
+            }
+            return list;
         }
 
-        public int SaveChanges()
+        public virtual void SaveChanges()
         {
             foreach (var kv in this.pkDict)
             {
@@ -106,9 +135,9 @@ namespace MyOrm.DBContext
                     throw new InvalidOperationException("You Can't Modify Entity's Primary Key");
                 }
             }
-            var insert = new List<T>();
-            var delete = new List<T>();
-            var update = new List<T>();
+            var insert = new List<TEntity>();
+            var delete = new List<TEntity>();
+            var update = new List<TEntity>();
             foreach (var kv in this.entityDict)
             {
                 switch (kv.Value.EntityState)
@@ -124,8 +153,13 @@ namespace MyOrm.DBContext
                         break;
                 }
             }
+            var dbConvert = ClassFactory.GetEntityDBConvert();
+            insert = dbConvert.Insert(insert);
+            foreach (var item in insert)
+            {
+                this.pkDict.Add(this.entityPKProp.GetValue(item), item);
+            }
 
-            return 0;
         }
     }
 }

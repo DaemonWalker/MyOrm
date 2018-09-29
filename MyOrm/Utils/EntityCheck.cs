@@ -1,5 +1,7 @@
-﻿using MyOrm.DBContext;
+﻿using MyOrm.Attributes;
+using MyOrm.DBContext;
 using MyOrm.Exceptions;
+using MyOrm.Factories;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,8 +17,8 @@ namespace MyOrm.Utils
             foreach (var prop in t.GetProperties())
             {
                 if (prop.CustomAttributes
-                    .Where(p => p.AttributeType.Name == "PrimaryKeyAttribute")
-                    .Count() != 1)
+                    .Where(p => p.AttributeType == ClassFactory.GetPKAttrType)
+                    .Count() != 0)
                 {
                     return prop;
                 }

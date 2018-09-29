@@ -31,7 +31,7 @@ namespace MyOrm.QueryProvider
         public TResult Execute<TResult>(Expression expression)
         {
             MethodCallExpression methodCall = (expression as MethodCallExpression);//.Arguments[0] as MethodCallExpression;
-            if (methodCall.Arguments.Count < 2)
+            if (methodCall != null && methodCall.Arguments.Count < 2)
             {
                 methodCall = methodCall.Arguments[0] as MethodCallExpression;
             }
@@ -71,7 +71,7 @@ namespace MyOrm.QueryProvider
                 methodCall = method as MethodCallExpression;
             }
 
-            AbsEntityDataBaseConvert convert = null;
+            AbsEntityDataBaseConvert convert = ClassFactory.GetEntityDBConvert();
             object result = null;
             if (orderbyParm != null)
             {
@@ -81,21 +81,8 @@ namespace MyOrm.QueryProvider
             {
                 result = convert.Select<T>(whereParm);
             }
+            //if(result.GetType().GetInterface())
             return (TResult)result;
-
-
-            var tableName = TypeHepler.GetClassGenericType(this.GetType()).Name;
-            var sql = new StringBuilder($@"select * from {tableName}");
-            if (whereParm != null)
-            {
-                sql.AppendFormat(" where {0}", ExpressionAnalyze.Where(whereParm.Body));
-            }
-            if (orderbyParm != null)
-            {
-                sql.AppendFormat(" order by {0}", ExpressionAnalyze.OrderBy(orderbyParm.Body));
-            }
-            dynamic data = this.DataOperator.QueryObject<T>(sql.ToString());
-            return (TResult)data;
         }
     }
 }

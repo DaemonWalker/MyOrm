@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq.Expressions;
+using System.Reflection;
 using System.Text;
 
 namespace MyOrm.Utils
@@ -9,6 +10,15 @@ namespace MyOrm.Utils
     {
         public static string Where(Expression expression)
         {
+            if (expression == null)
+            {
+                return " 1 = 1 ";
+            }
+            var bodyProp = expression.GetType().GetProperty("Body");
+            if (bodyProp != null)
+            {
+                expression = bodyProp.GetValue(expression) as Expression;
+            }
             if (expression is BinaryExpression)
             {
                 var binExp = expression as BinaryExpression;
@@ -82,6 +92,10 @@ namespace MyOrm.Utils
 
         public static string OrderBy(Expression expression)
         {
+            if (expression == null)
+            {
+                return string.Empty;
+            }
             if (expression is BinaryExpression)
             {
                 var binExp = expression as BinaryExpression;

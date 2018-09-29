@@ -1,4 +1,5 @@
-﻿using MyOrm.DBContext;
+﻿using MyOrm.Attributes;
+using MyOrm.DBContext;
 using MyOrm.Factories;
 using MyOrm.QueryProvider;
 using System;
@@ -14,13 +15,10 @@ namespace Test
     {
         static void Main(string[] args)
         {
-            ClassFactory.GetDBContext<Money_INFO>()
-                .Where(p => p.DAY_ID > 8)
-                .Where(p => p.MONEYINFO_ID > 10)
-                .OrderBy(p => p.DAY_ID)
-                .ThenBy(p => p.USE_WAY)
-                .ToList();
-
+            var ddd = ClassFactory.GetDBContext<DAY_INFO>();
+            var d = ddd.ToList().First();
+            ddd.Delete(d);
+            ddd.SaveChanges();
             //Expression<Func<Money_INFO, DateTime>> exp = p => p.DateTime;
             //Expression<Func<Money_INFO, dynamic>> foo = Expression.Lambda<Func<Money_INFO, dynamic>>(exp.Body, exp.Parameters);
             // foo.Compile();
@@ -28,6 +26,7 @@ namespace Test
 
         class DAY_INFO
         {
+            [PrimaryKey]
             public int DAY_ID { get; set; }
             public string DATE { get; set; }
             public override string ToString()

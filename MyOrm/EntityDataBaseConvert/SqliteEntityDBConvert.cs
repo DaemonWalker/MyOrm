@@ -1,4 +1,6 @@
-﻿using MyOrm.Utils;
+﻿using MyOrm.Attributes;
+using MyOrm.Factories;
+using MyOrm.Utils;
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
@@ -15,66 +17,39 @@ namespace MyOrm.EntityDataBaseConvert
             throw new NotImplementedException();
         }
 
-        public override T Delete<T>(T t)
-        {
-            throw new NotImplementedException();
-        }
-
         public override List<T> Delete<T>(IEnumerable<T> ts)
         {
-            throw new NotImplementedException();
-        }
+            var pkProp = typeof(T)
+                .GetProperties()
+                .First(p => p.CustomAttributes
+                    .Count(p2 => p2.AttributeType == ClassFactory.GetPKAttrType) > 0);
 
-        public override T Insert<T>(T t)
-        {
-            var tableName = typeof(T).Name;
-            var col = new StringBuilder();
-            var parms = new StringBuilder();
-            foreach (var prop in typeof(T).GetProperties())
+            Func<DbCommand, int> foo = (command) =>
             {
-                if (prop.CanWrite &&
-                    prop.CustomAttributes.Where(p => p.AttributeType.Name == "").Count() == 0)
+                var result = 0;
+                foreach (var t in ts)
                 {
-                    col.AppendFormat("{0}, ", prop.Name);
-                    parms.AppendFormat("{0}, ", prop.GetValue(t));
+                    var sql = $@"
+delete from {typeof(T).Name}
+where {pkProp.Name}='{pkProp.GetValue(t)}'";
+
+                    command.CommandText = sql;
+                    result = result + command.ExecuteNonQuery();
                 }
-            }
-            col.Length = col.Length - 2;
-            parms.Length = parms.Length - 2;
-            var sql = $@"
-insert into {tableName} 
-       ({col.ToString()})
-values ({parms.ToString()})";
-
-            var pkProp = typeof(T).GetProperties().First(
-                p => p.CustomAttributes.Count(p2 => p2.AttributeType.Name == "") > 0);
-            var pk = $@"
-SELECT {pkProp.Name}
-  FROM {tableName}
- WHERE changes() = 1 
-   AND {pkProp.Name} = last_insert_rowid()";
-
-            Func<DbCommand, int> execute = (dbCommand) =>
-            {
-                dbCommand.CommandText = sql;
-                var result = dbCommand.ExecuteNonQuery();
-
-                dbCommand.CommandText = pk;
-                pkProp.SetValue(t, dbCommand.ExecuteScalar());
                 return result;
             };
-
-            this.dataOperator.ExecuteNonQuery(execute);
-            return t;
+            this.dataOperator.ExecuteNonQuery(foo);
+            return ts.ToList();
         }
 
         public override List<T> Insert<T>(IEnumerable<T> ts)
         {
             var tableName = typeof(T).Name;
-            
+
 
             var pkProp = typeof(T).GetProperties().First(
-                p => p.CustomAttributes.Count(p2 => p2.AttributeType.Name == "") > 0);
+                p => p.CustomAttributes.Count(
+                    p2 => p2.AttributeType == ClassFactory.GetPKAttrType) > 0);
             var pk = $@"
 SELECT {pkProp.Name}
   FROM {tableName}
@@ -91,10 +66,12 @@ SELECT {pkProp.Name}
                     foreach (var prop in typeof(T).GetProperties())
                     {
                         if (prop.CanWrite &&
-                            prop.CustomAttributes.Where(p => p.AttributeType.Name == "").Count() == 0)
+                            prop.CustomAttributes
+                            .Where(p => p.AttributeType == ClassFactory.GetPKAttrType)
+                            .Count() == 0)
                         {
                             col.AppendFormat("{0}, ", prop.Name);
-                            parms.AppendFormat("{0}, ", prop.GetValue(t));
+                            parms.AppendFormat("'{0}', ", prop.GetValue(t));
                         }
                     }
                     col.Length = col.Length - 2;
@@ -107,7 +84,7 @@ values ({parms.ToString()})";
                     result = result + dbCommand.ExecuteNonQuery();
 
                     dbCommand.CommandText = pk;
-                    pkProp.SetValue(t, dbCommand.ExecuteScalar());
+                    pkProp.SetValue(t, Convert.ChangeType(dbCommand.ExecuteScalar(), pkProp.PropertyType));
                 }
                 return result;
             };
@@ -137,12 +114,6 @@ select * from {tableName}
         {
             throw new NotImplementedException();
         }
-
-        public override T Update<T>(T t)
-        {
-            throw new NotImplementedException();
-        }
-
         public override List<T> Update<T>(IEnumerable<T> ts)
         {
             throw new NotImplementedException();

@@ -14,11 +14,8 @@ namespace MyOrm.EntityDataBaseConvert
         {
             dataOperator = ClassFactory.GetDataOperator();
         }
-        public abstract T Insert<T>(T t);
         public abstract List<T> Insert<T>(IEnumerable<T> ts);
-        public abstract T Update<T>(T t);
         public abstract List<T> Update<T>(IEnumerable<T> ts);
-        public abstract T Delete<T>(T t);
         public abstract List<T> Delete<T>(IEnumerable<T> ts);
         public abstract List<T> Select<T>(Expression where);
         public abstract List<T> Select<T>(Expression where, Expression orderBy);

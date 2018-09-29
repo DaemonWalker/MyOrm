@@ -7,6 +7,6 @@ namespace MyOrm.Exceptions
     public class NoPrimaryKeyException : Exception
     {
         public NoPrimaryKeyException(Type t)
-            : base($"Type \"{t.FullName}\" Has No Primary Key.Please Use PrimaryKeyAttribute On PK Property") { }
+            : base($"Type \"{t.FullName}\" Has No Primary Key.Please Use On PK Property") { }
     }
 }
