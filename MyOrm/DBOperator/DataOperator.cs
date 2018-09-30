@@ -29,6 +29,15 @@ namespace MyOrm.DBOperator
                 throw e;
             }
         }
+
+        public override object ExecuteSclar(string sql)
+        {
+            Console.WriteLine(sql);
+            var comm = this.DataBase.GetCommand(false);
+            comm.CommandText = sql;
+            return comm.ExecuteScalar();
+        }
+
         public override List<T> QueryObject<T>(string sql)
         {
             Console.WriteLine(sql);
@@ -38,7 +47,7 @@ namespace MyOrm.DBOperator
             {
                 if (prop.CanWrite)
                 {
-                    props.Add(prop.Name.ToLower().Replace("_", ""), prop);
+                    props.Add(prop.Name, prop);
                 }
             }
 
@@ -49,7 +58,7 @@ namespace MyOrm.DBOperator
             var fieldNames = new List<string>();
             for (var i = 0; i < reader.FieldCount; i++)
             {
-                fieldNames.Add(reader.GetName(i).ToLower().Replace("_", ""));
+                fieldNames.Add(reader.GetName(i));
             }
 
             while (reader.Read())
@@ -65,6 +74,7 @@ namespace MyOrm.DBOperator
                 }
                 list.Add(t);
             }
+
             return list;
         }
 

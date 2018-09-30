@@ -19,5 +19,6 @@ namespace MyOrm.DBOperator
         public abstract List<T> QueryObject<T>(string sql);
         public abstract DataTable QuerySql(string sql);
         public abstract int ExecuteNonQuery(Func<DbCommand, int> executeFunc);
+        public abstract object ExecuteSclar(string sql);
     }
 }

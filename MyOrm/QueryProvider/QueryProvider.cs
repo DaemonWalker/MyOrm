@@ -28,44 +28,68 @@ namespace MyOrm.QueryProvider
             throw new NotImplementedException();
         }
 
-        public TResult Execute<TResult>(Expression expression)
+        public virtual TResult Execute<TResult>(Expression expression)
         {
             MethodCallExpression methodCall = (expression as MethodCallExpression);//.Arguments[0] as MethodCallExpression;
-            if (methodCall != null && methodCall.Arguments.Count < 2)
-            {
-                methodCall = methodCall.Arguments[0] as MethodCallExpression;
-            }
+            //if (methodCall != null && methodCall.Arguments.Count < 2)
+            //{
+            //    methodCall = methodCall.Arguments[0] as MethodCallExpression;
+            //}
             LambdaExpression whereParm = null;
             LambdaExpression orderbyParm = null;
+            ConstantExpression takeParm = null;
+            bool isCount = false;
+            bool isFirst = true;
             while (methodCall != null)
             {
                 Expression method = methodCall.Arguments[0];
-                Expression lambda = methodCall.Arguments[1];
-                LambdaExpression right = (lambda as UnaryExpression).Operand as LambdaExpression;
-                if (methodCall.Method.Name == "Where")
+                if (methodCall.Arguments.Count == 1)
                 {
-                    if (whereParm == null)
+                    if (methodCall.Method.Name == "Count")
                     {
-                        whereParm = Expression.Lambda(right.Body, right.Parameters);
+                        isCount = true;
+                        whereParm = Expression.Lambda(Expression.Constant(true));
                     }
-                    else
+                    else if (methodCall.Method.Name == "First")
                     {
-                        Expression left = (whereParm as LambdaExpression).Body;
-                        Expression temp = Expression.AndAlso(right.Body, left);
-                        whereParm = Expression.Lambda(temp, whereParm.Parameters);
+                        isFirst = true;
+                        takeParm = constExpOperate(takeParm, Expression.Constant(1));
                     }
                 }
-                else
+                else if (methodCall.Arguments.Count == 2)
                 {
-                    if (orderbyParm == null)
+                    Expression lambda = methodCall.Arguments[1];
+                    Expression right = null;
+                    if (lambda is UnaryExpression)
                     {
-                        orderbyParm = Expression.Lambda(right.Body, right.Parameters);
+                        right = (lambda as UnaryExpression).Operand as LambdaExpression;
                     }
-                    else
+                    else if (lambda is ConstantExpression)
                     {
-                        Expression left = (orderbyParm as LambdaExpression).Body;
-                        Expression temp = Expression.Block(right.Body, left);
-                        orderbyParm = Expression.Lambda(temp, orderbyParm.Parameters);
+                        right = lambda as ConstantExpression;
+                    }
+                    if (methodCall.Method.Name == "Where")
+                    {
+                        whereParm = lambdaExpOperate(whereParm, right);
+                    }
+                    else if (methodCall.Method.Name == "Count")
+                    {
+                        isCount = true;
+                        whereParm = lambdaExpOperate(whereParm, right);
+                    }
+                    else if (methodCall.Method.Name == "Take")
+                    {
+                        takeParm = constExpOperate(takeParm, right);
+                    }
+                    else if (methodCall.Method.Name == "OrderBy")
+                    {
+                        orderbyParm = lambdaExpOperate(orderbyParm, right);
+                    }
+                    else if (methodCall.Method.Name == "First")
+                    {
+                        isFirst = true;
+                        whereParm = lambdaExpOperate(whereParm, right);
+                        takeParm = constExpOperate(takeParm, Expression.Constant(1));
                     }
                 }
                 methodCall = method as MethodCallExpression;
@@ -75,14 +99,51 @@ namespace MyOrm.QueryProvider
             object result = null;
             if (orderbyParm != null)
             {
-                result = convert.Select<T>(whereParm, orderbyParm);
+                var list = convert.Select<T>(whereParm, orderbyParm, takeParm);
+                if (isFirst)
+                {
+                    result = list.First();
+                }
+                else
+                {
+                    result = list;
+                }
             }
-            else
+            else if (isCount)
             {
-                result = convert.Select<T>(whereParm);
+                result = convert.Count<T>(whereParm);
             }
             //if(result.GetType().GetInterface())
             return (TResult)result;
+        }
+
+        private LambdaExpression lambdaExpOperate(LambdaExpression lambda, Expression right)
+        {
+            var labExp = right as LambdaExpression;
+            if (lambda == null)
+            {
+                lambda = Expression.Lambda(labExp.Body, labExp.Parameters);
+            }
+            else
+            {
+                Expression left = (lambda as LambdaExpression).Body;
+                Expression temp = Expression.AndAlso(labExp.Body, left);
+                lambda = Expression.Lambda(temp, lambda.Parameters);
+            }
+            return lambda;
+        }
+        private ConstantExpression constExpOperate(ConstantExpression constExp, Expression right)
+        {
+            var constRight = right as ConstantExpression;
+            if (constExp == null)
+            {
+                constExp = right as ConstantExpression;
+                return constExp;
+            }
+            else
+            {
+                throw new InvalidOperationException("Too Many Take Called!");
+            }
         }
     }
 }

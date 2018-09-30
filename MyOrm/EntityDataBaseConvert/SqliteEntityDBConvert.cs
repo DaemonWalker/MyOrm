@@ -14,7 +14,11 @@ namespace MyOrm.EntityDataBaseConvert
     {
         public override int Count<T>(Expression where)
         {
-            throw new NotImplementedException();
+            var sqlTemp = @"
+select count(1) from {0}
+ where {1}";
+            var sql = string.Format(sqlTemp, typeof(T).Name, ExpressionAnalyze.Where(where));
+            return (int)Convert.ChangeType(this.dataOperator.ExecuteSclar(sql), typeof(int));
         }
 
         public override List<T> Delete<T>(IEnumerable<T> ts)
@@ -23,16 +27,16 @@ namespace MyOrm.EntityDataBaseConvert
                 .GetProperties()
                 .First(p => p.CustomAttributes
                     .Count(p2 => p2.AttributeType == ClassFactory.GetPKAttrType) > 0);
+            var sqlTemp = @"
+delete from {0}
+where {1}='{2}'";
 
             Func<DbCommand, int> foo = (command) =>
             {
                 var result = 0;
                 foreach (var t in ts)
                 {
-                    var sql = $@"
-delete from {typeof(T).Name}
-where {pkProp.Name}='{pkProp.GetValue(t)}'";
-
+                    var sql = string.Format(sqlTemp, typeof(T).Name, pkProp.Name, pkProp.GetValue(t));
                     command.CommandText = sql;
                     result = result + command.ExecuteNonQuery();
                 }
@@ -45,7 +49,7 @@ where {pkProp.Name}='{pkProp.GetValue(t)}'";
         public override List<T> Insert<T>(IEnumerable<T> ts)
         {
             var tableName = typeof(T).Name;
-
+            var props = typeof(T).GetProperties().ToList();
 
             var pkProp = typeof(T).GetProperties().First(
                 p => p.CustomAttributes.Count(
@@ -56,30 +60,37 @@ SELECT {pkProp.Name}
  WHERE changes() = 1 
    AND {pkProp.Name} = last_insert_rowid()";
 
+            var col = new StringBuilder();
+            var parms = new StringBuilder();
+            for (var i = 0; i < props.Count; i++)
+            {
+                var prop = props[i];
+                if (prop.CanWrite &&
+                    prop.CustomAttributes
+                    .Where(p => p.AttributeType == ClassFactory.GetPKAttrType)
+                    .Count() == 0)
+                {
+                    col.AppendFormat("{0}, ", prop.Name);
+                    parms.AppendFormat("'{{{0}}}', ", i);
+                }
+            }
+            col.Length = col.Length - 2;
+            parms.Length = parms.Length - 2;
+            var sqlTemp = new StringBuilder();
+            sqlTemp.AppendFormat(
+                "insert into {0} ({1}) values ({2})",
+                tableName,
+                col.ToString(),
+                parms.ToString());
+
             Func<DbCommand, int> execute = (dbCommand) =>
             {
                 var result = 0;
                 foreach (var t in ts)
                 {
-                    var col = new StringBuilder();
-                    var parms = new StringBuilder();
-                    foreach (var prop in typeof(T).GetProperties())
-                    {
-                        if (prop.CanWrite &&
-                            prop.CustomAttributes
-                            .Where(p => p.AttributeType == ClassFactory.GetPKAttrType)
-                            .Count() == 0)
-                        {
-                            col.AppendFormat("{0}, ", prop.Name);
-                            parms.AppendFormat("'{0}', ", prop.GetValue(t));
-                        }
-                    }
-                    col.Length = col.Length - 2;
-                    parms.Length = parms.Length - 2;
-                    var sql = $@"
-insert into {tableName} 
-       ({col.ToString()})
-values ({parms.ToString()})";
+                    var sql = string.Format(
+                        sqlTemp.ToString(),
+                        props.Select(p => p.GetValue(t)).ToArray());
                     dbCommand.CommandText = sql;
                     result = result + dbCommand.ExecuteNonQuery();
 
@@ -100,13 +111,22 @@ values ({parms.ToString()})";
             return dataOperator.QueryObject<T>(sql.ToString());
         }
 
-        public override List<T> Select<T>(Expression where, Expression orderBy)
+        public override List<T> Select<T>(LambdaExpression where, LambdaExpression orderBy, ConstantExpression take)
         {
             var tableName = typeof(T).Name;
             var sql = new StringBuilder($@"
 select * from {tableName} 
- where {ExpressionAnalyze.Where(where)}
+ where {ExpressionAnalyze.Where(where)}");
+            if (orderBy != null)
+            {
+                sql.Append($@"
  order by {ExpressionAnalyze.OrderBy(orderBy)}");
+            }
+            if (take != null)
+            {
+                sql.Append($@"
+ limit 0, {ExpressionAnalyze.OrderBy(take)}");
+            }
             return dataOperator.QueryObject<T>(sql.ToString());
         }
 
@@ -116,7 +136,46 @@ select * from {tableName}
         }
         public override List<T> Update<T>(IEnumerable<T> ts)
         {
-            throw new NotImplementedException();
+            var pkProp = typeof(T)
+                .GetProperties()
+                .First(p => p.CustomAttributes
+                    .Count(p2 => p2.AttributeType == ClassFactory.GetPKAttrType) > 0);
+            var tableName = typeof(T).Name;
+            var props = typeof(T).GetProperties().ToList();
+            var sqlTemp = new StringBuilder($@"update {tableName} set ");
+            for (int i = 0; i < props.Count; i++)
+            {
+                var prop = typeof(T).GetProperties()[i];
+                if (prop.GetHashCode() != pkProp.GetHashCode() &&
+                    prop.CanWrite == false)
+                {
+                    continue;
+                }
+                sqlTemp.AppendFormat("{0} = '{{{1}}}',", prop.Name, i);
+            }
+            sqlTemp.Length = sqlTemp.Length - 1;
+            sqlTemp.AppendFormat(
+                " where {0} = '{{{1}}}'",
+                pkProp.Name,
+                props.IndexOf(pkProp));
+
+            Func<DbCommand, int> func = (command) =>
+            {
+                var result = 0;
+                foreach (var t in ts)
+                {
+                    var sql = string.Format(
+                        sqlTemp.ToString(),
+                        props.Select(p => p.GetValue(t)).ToArray());
+                    command.CommandText = sql;
+                    result = result + command.ExecuteNonQuery();
+                }
+                return result;
+            };
+            this.dataOperator.ExecuteNonQuery(func);
+
+            return ts.ToList();
         }
+
     }
 }

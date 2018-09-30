@@ -5,6 +5,7 @@ using MyOrm.QueryProvider;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
@@ -15,109 +16,74 @@ namespace Test
     {
         static void Main(string[] args)
         {
-            var ddd = ClassFactory.GetDBContext<DAY_INFO>();
-            var d = ddd.ToList().First();
-            ddd.Delete(d);
-            ddd.SaveChanges();
-            //Expression<Func<Money_INFO, DateTime>> exp = p => p.DateTime;
-            //Expression<Func<Money_INFO, dynamic>> foo = Expression.Lambda<Func<Money_INFO, dynamic>>(exp.Body, exp.Parameters);
-            // foo.Compile();
-        }
+            var rand = new Random();
+            //var list = CreateData();
 
-        class DAY_INFO
-        {
-            [PrimaryKey]
-            public int DAY_ID { get; set; }
-            public string DATE { get; set; }
-            public override string ToString()
+            ShowTime(() =>
             {
-                return $"ID:{DAY_ID} DATE:{DATE}";
-            }
+                using (var db = new TestDBContext() { DetectEntityChange = false })
+                {
+                    var l = db.OrderBy(p => p.AGE).First(p => p.TEST_ID % 2 == 0);
+                    Console.WriteLine(l.TEST_ID);
+                }
+            });
         }
-
-        class Money_INFO
+        static void ShowTime(Action action)
         {
-            public int MONEYINFO_ID { get; set; }
-            public string USE_WAY { get; set; }
-            public double USE_AMOUNT { get; set; }
-            public int TYPE_ID { get; set; }
-            public int DAY_ID { get; set; }
-
-            public DateTime DateTime { get; set; }
+            var sw = new Stopwatch();
+            Console.WriteLine("Start");
+            sw.Start();
+            action.Invoke();
+            sw.Stop();
+            Console.WriteLine($"{sw.ElapsedMilliseconds / 1000}\"{sw.ElapsedMilliseconds % 1000}");
         }
+        static List<TEST_TABLE> CreateData()
+        {
+            var rand = new Random();
+            var list = new List<TEST_TABLE>();
+            for (int i = 0; i < 26; i++)
+            {
+                for (int j = 0; j < 26; j++)
+                {
+                    for (int k = 0; k < 26; k++)
+                    {
+                        for (int l = 0; l < 26; l++)
+                        {
+                            var entity = new TEST_TABLE();
+                            entity.ADDRESS = "新街大院14号楼" + (rand.Next(20) * 100 + rand.Next(20));
+                            entity.AGE = rand.Next(100);
+                            entity.CREATE_DATE = DateTime.Now.ToString("yyyy-MM-dd");
+                            entity.CREATE_OPER = "Admin";
+                            entity.NAME = $"{(char)('a' + i)}{(char)('a' + j)}{(char)('a' + k)}{(char)('a' + l)}";
+                            entity.SEX = rand.Next(2) % 2 == 0 ? "male" : "female";
+                            entity.TEL = "1560401" + rand.Next(10000);
+                            entity.VALID_STATE = "1";
+                            list.Add(entity);
+                        }
+                    }
+                }
+            }
+            return list;
+        }
+
     }
-    class Exp
-    {
-        public static string ExpressionAnalyze(Expression expression)
-        {
-            if (expression is BinaryExpression)
-            {
-                var binExp = expression as BinaryExpression;
-                var left = ExpressionAnalyze(binExp.Left);
-                var right = ExpressionAnalyze(binExp.Right);
-                var op = string.Empty;
-                switch (binExp.NodeType)
-                {
-                    case ExpressionType.Equal:
-                        op = "=";
-                        break;
-                    case ExpressionType.AndAlso:
-                        op = "and";
-                        break;
-                    case ExpressionType.OrElse:
-                        op = "or";
-                        break;
-                    case ExpressionType.NotEqual:
-                        op = "!=";
-                        break;
-                    case ExpressionType.GreaterThan:
-                        op = ">";
-                        break;
-                    case ExpressionType.Add:
-                        op = "+";
-                        break;
-                    case ExpressionType.Subtract:
-                        op = "-";
-                        break;
-                    case ExpressionType.Multiply:
-                        op = "*";
-                        break;
-                    case ExpressionType.Divide:
-                        op = "/";
-                        break;
-                }
-                return $"({left}  {op}  {right})";
-            }
-            else if (expression is MemberExpression)
-            {
-                var memExp = expression as MemberExpression;
-                return $"{memExp.Member.DeclaringType.Name}.{ memExp.Member.Name}";
-            }
-            else if (expression is ConstantExpression)
-            {
-                var conExp = expression as ConstantExpression;
-                if (conExp.Type == typeof(string))
-                {
-                    return $"'{conExp.Value.ToString()}'";
-                }
-                else if (conExp.Type == typeof(int))
-                {
-                    return conExp.Value.ToString();
-                }
-                else if (conExp.Type == typeof(bool))
-                {
-                    if (((bool)conExp.Value) == true)
-                    {
-                        return "(1=1)";
-                    }
-                    else
-                    {
-                        return "(1=0)";
-                    }
-                }
-            }
 
-            throw new ArgumentException("Invaild Expression!");
-        }
+    public class TestDBContext : AbsDBContext<TEST_TABLE>
+    {
+
+    }
+    public class TEST_TABLE
+    {
+        [PrimaryKey]
+        public int TEST_ID { get; set; }
+
+        public string NAME { get; set; }
+        public string CREATE_DATE { get; set; }
+        public string CREATE_OPER { get; set; }
+        public string VALID_STATE { get; set; }
+        public string TEL { get; set; }
+        public string SEX { get; set; }
+        public int AGE { get; set; }
+        public string ADDRESS { get; set; }
     }
 }

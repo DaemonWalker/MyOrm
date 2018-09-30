@@ -9,9 +9,10 @@ namespace MyOrm.DataBase
     class MSSqliteDataBase : IDataBase
     {
         private const string connStr = "data source=db.db";
+        private DbConnection conn;
         public DbConnection GetConnection()
         {
-            var conn = new SqliteConnection(connStr);
+            conn = new SqliteConnection(connStr);
             SQLitePCL.Batteries.Init();
             conn.Open();
             return conn;
@@ -24,7 +25,7 @@ namespace MyOrm.DataBase
 
         public DbCommand GetCommand(bool openTranscation)
         {
-            var conn = this.GetConnection();
+            conn = this.GetConnection();
             var comm = conn.CreateCommand();
             if (openTranscation)
             {
@@ -41,7 +42,7 @@ namespace MyOrm.DataBase
 
         public void Dispose()
         {
-            throw new NotImplementedException();
+            conn.Close();
         }
     }
 }

@@ -18,7 +18,7 @@ namespace MyOrm.EntityDataBaseConvert
         public abstract List<T> Update<T>(IEnumerable<T> ts);
         public abstract List<T> Delete<T>(IEnumerable<T> ts);
         public abstract List<T> Select<T>(Expression where);
-        public abstract List<T> Select<T>(Expression where, Expression orderBy);
+        public abstract List<T> Select<T>(LambdaExpression where, LambdaExpression orderBy, ConstantExpression take);
         public abstract int Count<T>(Expression where);
         public abstract object Sum<T>(Expression where, Expression prop);
     }

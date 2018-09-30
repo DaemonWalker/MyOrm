@@ -14,11 +14,12 @@ using System.Text;
 
 namespace MyOrm.DBContext
 {
-    public abstract class AbsDBContext<TEntity> : IQueryable<TEntity>, IOrderedQueryable<TEntity> where TEntity : class
+    public abstract class AbsDBContext<TEntity> : IQueryable<TEntity>, IOrderedQueryable<TEntity>, IDisposable where TEntity : class
     {
         private Dictionary<TEntity, EntityEntry<TEntity>> entityDict = new Dictionary<TEntity, EntityEntry<TEntity>>();
         private Dictionary<object, TEntity> pkDict = new Dictionary<object, TEntity>();
         private PropertyInfo entityPKProp;
+        public bool DetectEntityChange { get; set; } = true;
         public AbsDBContext()
         {
             this.entityPKProp = this.GetPKProperty(this.ElementType);
@@ -67,6 +68,7 @@ namespace MyOrm.DBContext
             }
             foreach (var item in result)
             {
+                this.InsertEntityEntry(item);
                 yield return item;
             }
         }
@@ -125,14 +127,45 @@ namespace MyOrm.DBContext
             }
             return list;
         }
-
+        public virtual EntityEntry<TEntity> Update(TEntity t)
+        {
+            this.entityDict[t].EntityState = EntityState.Update;
+            return this.entityDict[t];
+        }
+        public virtual List<EntityEntry<TEntity>> UpdateRange(IEnumerable<TEntity> ts)
+        {
+            return ts.Select(p =>
+            {
+                this.entityDict[p].EntityState = EntityState.Update;
+                return this.entityDict[p];
+            }).ToList();
+        }
         public virtual void SaveChanges()
         {
             foreach (var kv in this.pkDict)
             {
-                if (kv.Key != this.entityPKProp.GetValue(kv.Value))
+                if (kv.Key.Equals(this.entityPKProp.GetValue(kv.Value)) == false)
                 {
                     throw new InvalidOperationException("You Can't Modify Entity's Primary Key");
+                }
+            }
+            if (this.DetectEntityChange)
+            {
+                var props = typeof(TEntity).GetProperties();
+                foreach (var kv in this.entityDict)
+                {
+                    if (kv.Value.EntityState != EntityState.Select)
+                    {
+                        continue;
+                    }
+                    foreach (var prop in props)
+                    {
+                        if (prop.GetValue(kv.Key).Equals(kv.Value.Entity) == false)
+                        {
+                            kv.Value.EntityState = EntityState.Update;
+                            break;
+                        }
+                    }
                 }
             }
             var insert = new List<TEntity>();
@@ -158,8 +191,15 @@ namespace MyOrm.DBContext
             foreach (var item in insert)
             {
                 this.pkDict.Add(this.entityPKProp.GetValue(item), item);
+                this.entityDict[item].EntityState = EntityState.Select;
             }
 
+            delete = dbConvert.Delete(delete);
+            update = dbConvert.Update(update);
+
+        }
+        public void Dispose()
+        {
         }
     }
 }

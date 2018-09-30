@@ -55,6 +55,12 @@ namespace MyOrm.Utils
                     case ExpressionType.Divide:
                         op = "/";
                         break;
+                    case ExpressionType.LessThan:
+                        op = "<";
+                        break;
+                    case ExpressionType.Modulo:
+                        op = "%";
+                        break;
                 }
                 return $"({left}  {op}  {right})";
             }
@@ -95,6 +101,11 @@ namespace MyOrm.Utils
             if (expression == null)
             {
                 return string.Empty;
+            }
+            var bodyProp = expression.GetType().GetProperty("Body");
+            if (bodyProp != null)
+            {
+                expression = bodyProp.GetValue(expression) as Expression;
             }
             if (expression is BinaryExpression)
             {
@@ -145,5 +156,7 @@ namespace MyOrm.Utils
 
             throw new ArgumentException("Invaild OrderBy Expression!");
         }
+
+        
     }
 }

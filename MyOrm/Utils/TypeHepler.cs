@@ -11,7 +11,14 @@ namespace MyOrm.Utils
     {
         public static Type GetClassGenericType(Type t)
         {
-            return t.GenericTypeArguments[0];
+            if (t.IsGenericType)
+            {
+                return t.GenericTypeArguments[0];
+            }
+            else
+            {
+                return GetClassGenericType(t.BaseType);
+            }
         }
         public static T DeepCopy<T>(this T t)
         {
